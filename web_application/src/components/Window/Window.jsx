@@ -1,0 +1,238 @@
+// Window.jsx
+import { useEffect, useRef, useState } from 'react';
+import { assets } from '../../assets/assets';
+import { doc, addDoc, getDoc, updateDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../../firebase.config';
+import WebFont from 'webfontloader';
+import Sidebar from '../Sidebar/Sidebar';
+import { marked } from 'marked';
+import './Window.css';
+
+const Window = ({ isOpen, onToggle }) => {
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [currentThread, setCurrentThread] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    WebFont.load({
+      google: {
+        families: ['K2D:400,500,700&display=swap', 'Readex Pro:400,500,700&display=swap'],
+      },
+    });
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    const loadThreadHistory = async () => {
+      if (!currentThread) {
+        setMessages([]);
+        setHasSubmitted(false);
+        return;
+      }
+
+      try {
+        const threadRef = doc(db, 'threads', currentThread);
+        const threadSnap = await getDoc(threadRef);
+        if (threadSnap.exists()) {
+          const threadData = threadSnap.data();
+          setMessages(threadData.contents || []);
+          setHasSubmitted(threadData.contents?.length > 0);
+        } else {
+          setMessages([]);
+          setHasSubmitted(false);
+        }
+      } catch (error) {
+        console.error('Lỗi tải lịch sử thread:', error);
+        setMessages([]);
+        setHasSubmitted(false);
+      }
+    };
+
+    loadThreadHistory();
+  }, [currentThread]);
+
+  const createMsgElement = (content, type, loading = false) => ({
+    id: Date.now(),
+    type,
+    content,
+    loading,
+    timestamp: new Date().toISOString(),
+  });
+
+  const updateThreadContent = async (threadId, updatedHistory) => {
+    try {
+      const threadRef = doc(db, 'threads', threadId);
+      await updateDoc(threadRef, { contents: updatedHistory });
+      console.log('Cập nhật nội dung thread thành công');
+    } catch (e) {
+      console.error('Lỗi cập nhật nội dung thread:', e);
+    }
+  };
+
+  const updateCurrentThread = (threadId) => {
+    setCurrentThread(threadId);
+  };
+
+  const formatMarkdownToHTML = (markdownText) => marked.parse(markdownText || '');
+
+  const updateChatHistory = (newChatHistory) => {
+    setMessages(newChatHistory);
+    setHasSubmitted(newChatHistory.length > 0);
+  };
+
+  const onHandleSubmit = async (e) => {
+    e.preventDefault();
+    const userMessage = input.trim();
+    if (!userMessage) return;
+
+    setInput('');
+    setHasSubmitted(true);
+
+    const userMsg = createMsgElement(userMessage, 'user');
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+
+    if (currentThread) {
+      await updateThreadContent(currentThread, updatedMessages);
+    }
+
+    let threadId = currentThread;
+    if (!threadId) {
+      try {
+        const threadRef = await addDoc(collection(db, 'threads'), {
+          title: 'Cuộc trò chuyện mới',
+          contents: [],
+          timestamp: serverTimestamp(),
+        });
+        threadId = threadRef.id;
+        setCurrentThread(threadId);
+        await updateThreadContent(threadId, updatedMessages);
+      } catch (error) {
+        console.error('Error creating thread:', error);
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    const loadingMsg = createMsgElement('', 'bot', true);
+    setMessages((prev) => [...prev, loadingMsg]);
+
+    const latestHistory = updatedMessages.slice(-10).map((msg) => ({
+      role: msg.type === 'user' ? 'user' : 'assistant',
+      content: msg.content,
+    }));
+
+    try {
+      const res = await fetch('http://localhost:8000/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: userMessage,
+          response: '',
+          history: latestHistory,
+        }),
+      });
+      const data = await res.json();
+      const botResponse = data?.data?.response;
+      const htmlContent = formatMarkdownToHTML(botResponse);
+
+      if (botResponse) {
+        setMessages((prev) => {
+          const filtered = prev.filter((msg) => !msg.loading && msg.content.trim() !== '');
+          const botMsg = createMsgElement(htmlContent, 'bot');
+          const updated = [...filtered, botMsg];
+          updateThreadContent(threadId, updated);
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi:', error);
+      setMessages((prev) => prev.filter((msg) => !msg.loading));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="window-container">
+      <Sidebar
+        isOpen={isOpen}
+        onToggle={onToggle}
+        updateCurrentThread={updateCurrentThread}
+        updateChatHistory={updateChatHistory}
+      />
+      <div className={`main ${isOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}>
+        <nav className={`nav ${isOpen ? 'with-sidebar' : 'without-sidebar'}`}>
+          <p>REBot</p>
+        </nav>
+        <main className="main-container">
+          <section className={`chats-container ${isOpen ? 'with-sidebar' : 'without-sidebar'}`}>
+            {messages.map((msg, index) => (
+              <div
+                key={msg.id || index}
+                className={`message ${msg.type}-message ${msg.loading ? 'loading' : ''}`}
+              >
+                {msg.type === 'bot' ? (
+                  <>
+                    <img src={assets.bot_avatar} alt="bot-icon" className="avatar" />
+                    <div
+                      className="message-text"
+                      dangerouslySetInnerHTML={{
+                        __html: msg.loading ? 'Đang suy nghĩ...' : msg.content,
+                      }}
+                    />
+                  </>
+                ) : (
+                  <p className="message-text">{msg.content}</p>
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </section>
+        </main>
+        <div
+          className={`prompt-container ${hasSubmitted ? 'at-bottom' : 'centered'} ${isOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}
+        >
+          <div className="prompt-wrapper">
+            <div className="prompt-search">
+              <input
+                className="prompt-input"
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && onHandleSubmit(e)}
+                placeholder="Nhắn tin cho REBot"
+                required
+              />
+              <div className="prompt-actions">
+                <button
+                  id="send-btn"
+                  className="material-symbols-outlined"
+                  onClick={onHandleSubmit}
+                >
+                  send
+                </button>
+              </div>
+            </div>
+            <button id="theme-toggle-btn" className="material-symbols-outlined">
+              light_mode
+            </button>
+            <button id="delete-btn" className="material-symbols-outlined" onClick={() => setInput('')}>
+              delete
+            </button>
+          </div>
+          <p className="bottom-info">REBot có thể mắc lỗi. Hãy kiểm tra thông tin quan trọng.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Window;
