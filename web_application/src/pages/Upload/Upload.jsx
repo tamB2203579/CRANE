@@ -73,7 +73,7 @@ export default function Upload() {
       Đăng xuất
     </button>
     <div className="upload-container">
-      <h2 className="upload-title">Hệ thống Quản lý tài liệu REBot</h2>
+      <h2 className="upload-title">Hệ thống Quản lý tài liệu CRANE</h2>
 
       <label className="upload-dropzone">
         <input

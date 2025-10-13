@@ -170,7 +170,7 @@ const Window = ({ isOpen, onToggle }) => {
       />
       <div className={`main ${isOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}>
         <nav className={`nav ${isOpen ? 'with-sidebar' : 'without-sidebar'}`}>
-          <p>REBot</p>
+          <p>CRANE</p>
         </nav>
         <main className="main-container">
           <section className={`chats-container ${isOpen ? 'with-sidebar' : 'without-sidebar'}`}>
@@ -208,7 +208,7 @@ const Window = ({ isOpen, onToggle }) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && onHandleSubmit(e)}
-                placeholder="Nhắn tin cho REBot"
+                placeholder="Nhắn tin cho CRANE"
                 required
               />
               <div className="prompt-actions">
@@ -228,7 +228,7 @@ const Window = ({ isOpen, onToggle }) => {
               delete
             </button>
           </div>
-          <p className="bottom-info">REBot có thể mắc lỗi. Hãy kiểm tra thông tin quan trọng.</p>
+          <p className="bottom-info">CRANE có thể mắc lỗi. Hãy kiểm tra thông tin quan trọng.</p>
         </div>
       </div>
     </div>
