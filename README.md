@@ -23,7 +23,7 @@ We evaluate CRANE on institutional question–answering (Q-A) using two resource
 The following figure shows an illustrative fragment of the regulation-enriched graph (REG) used in CRANE. It visually summarizes part of the entity–relation structure that supports graph-guided evidence expansion. The figure is included for illustration and overview purposes, rather than as a complete visualization of the full graph.
 
 <p align="center">
-  <img src="Materials/Nodes.jpg" alt="Illustrative fragment of the regulation-enriched graph used in CRANE" width="850">
+  <img src="Materials/Nodes.jpg" alt="Illustrative fragment of the regulation-enriched graph used in CRANE" width="650">
 </p>
 
 <p align="center">
